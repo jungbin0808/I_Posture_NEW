@@ -921,3 +921,160 @@ nav .active {
     margin-top: 20px;
   }
 }
+
+/* Measurement report */
+.report-overview {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin: 20px 0;
+}
+.report-overview .panel {
+  margin: 0;
+  padding: 16px;
+}
+.report-overview strong {
+  display: block;
+  font-size: 24px;
+  margin-top: 8px;
+}
+.report-picker {
+  display: block;
+  margin: 20px 0;
+}
+.report-picker select {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+}
+.report-heading {
+  margin: 24px 0;
+}
+.report-heading h3 {
+  margin: 12px 0;
+}
+.report-table-wrap {
+  overflow-x: auto;
+  margin: 16px 0 24px;
+}
+.report-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.report-table th,
+.report-table td {
+  text-align: left;
+  padding: 16px 10px;
+  border-bottom: 1px solid var(--line);
+}
+.report-table thead {
+  background: #edf2e8;
+}
+.report-table th small {
+  display: block;
+  font-size: 10px;
+  font-weight: normal;
+  color: #687765;
+  margin-top: 6px;
+}
+.report-table td {
+  white-space: nowrap;
+}
+.report-media,
+.report-notes {
+  margin-top: 28px;
+}
+.report-notes p {
+  margin-bottom: 12px;
+}
+.report-link {
+  margin: 18px 0;
+}
+nav button {
+  flex: 1;
+  width: auto;
+}
+@media (max-width: 600px) {
+  .report-overview {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .measurement-report > .row {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .report-table {
+    font-size: 11px;
+  }
+  .report-table th,
+  .report-table td {
+    padding: 12px 6px;
+  }
+}
+@media print {
+  @page {
+    size: A4;
+    margin: 12mm;
+  }
+  body {
+    background: white;
+    color: #182b21;
+  }
+  .app > header,
+  .app > nav,
+  .app footer,
+  .no-print {
+    display: none !important;
+  }
+  .report-route main {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    padding: 0;
+  }
+  .report-overview {
+    display: none;
+  }
+  .measurement-report {
+    font-size: 11px;
+  }
+  .report-table-wrap {
+    overflow: visible;
+  }
+  .report-table thead {
+    display: table-header-group;
+  }
+  .report-table tr,
+  .pose-photo,
+  .report-heading,
+  .report-notes,
+  .chart {
+    break-inside: avoid;
+  }
+  .report-media .photos {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .report-media video,
+  .report-media select {
+    display: none;
+  }
+  .report-media .pose-photo {
+    max-height: 300px;
+  }
+  .report-media .pose-photo img {
+    max-height: 300px;
+    object-fit: contain;
+  }
+  .report-media .saved-image {
+    max-height: 360px;
+    object-fit: contain;
+  }
+  .report-table,
+  .report-table td {
+    white-space: normal;
+  }
+  .panel {
+    box-shadow: none;
+  }
+}

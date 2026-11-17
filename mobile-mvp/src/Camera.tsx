@@ -17,7 +17,6 @@ type Frame = {
   canvas: HTMLCanvasElement;
   time: number;
   phase: string;
-  good: boolean;
 };
 export function Camera(props: Props) {
   const latest = useRef(props);
@@ -29,7 +28,6 @@ export function Camera(props: Props) {
   const alive = useRef(true),
     generation = useRef(0),
     last = useRef<Frame | null>(null),
-    stable = useRef(0),
     loopTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined),
     countTimer = useRef<ReturnType<typeof setInterval> | undefined>(undefined),
     recordTimer = useRef<ReturnType<typeof setInterval> | undefined>(undefined),
@@ -59,7 +57,6 @@ export function Camera(props: Props) {
     session.current = null;
     void old?.close().catch(() => {});
     last.current = null;
-    stable.current = 0;
     if (alive.current) {
       setState("off");
       setReady(false);
@@ -138,22 +135,22 @@ export function Camera(props: Props) {
             latest.current.required,
             input.height / input.width,
           );
-          stable.current = points && !needed.length ? stable.current + 1 : 0;
-          const good =
-            !!points &&
-            !needed.length &&
-            stable.current >= 3 &&
-            performance.now() - time <= 1200;
+          const good = performance.now() - time <= 2000;
           setReady(good);
           setAbsent(needed.length);
           if (canvas.current)
             draw(canvas.current, points || {}, input.width, input.height);
-          if (points) {
+          {
             preserved.width = input.width;
             preserved.height = input.height;
             preserved.getContext("2d")!.drawImage(input, 0, 0);
-            last.current = { points, canvas: preserved, time, phase, good };
-          } else last.current = null;
+            last.current = {
+              points: points || {},
+              canvas: preserved,
+              time,
+              phase,
+            };
+          }
           loopTimer.current = setTimeout(() => void loop(), 100);
         } catch (e) {
           if (alive.current && token === generation.current) {
@@ -208,7 +205,6 @@ export function Camera(props: Props) {
   useEffect(() => {
     cancel();
     last.current = null;
-    stable.current = 0;
     setReady(false);
     setAbsent(props.required.length);
     setError("");
@@ -221,14 +217,13 @@ export function Camera(props: Props) {
     const frame = last.current;
     return (
       !!frame &&
-      frame.good &&
       frame.phase === latest.current.phase &&
-      performance.now() - frame.time <= 1200
+      performance.now() - frame.time <= 2000
     );
   }
   async function photo() {
     if (!valid()) {
-      setError("필수 관절이 화면 안에 보이도록 맞춘 후 다시 촬영해 주세요.");
+      setError("카메라 화면을 준비하고 있습니다. 잠시 후 다시 촬영해 주세요.");
       return;
     }
     const f = last.current!,
@@ -255,7 +250,7 @@ export function Camera(props: Props) {
   }
   function record() {
     if (!valid()) {
-      setError("필수 관절을 화면 안에 맞춘 후 녹화해 주세요.");
+      setError("카메라 화면을 준비하고 있습니다. 잠시 후 녹화해 주세요.");
       return;
     }
     if (typeof MediaRecorder === "undefined") {
@@ -378,9 +373,11 @@ export function Camera(props: Props) {
       <p className={"quality " + (ready ? "ready" : "")} aria-live="polite">
         {state === "live"
           ? ready
-            ? "✓ 필수 관절이 인식됐어요. 촬영할 수 있습니다."
+            ? absent
+              ? `관절 ${absent}개 미인식 · 그대로 촬영할 수 있어요. 일부 결과는 측정 불가로 표시됩니다.`
+              : "✓ 관절이 인식됐어요. 촬영할 수 있습니다."
             : absent
-              ? `필수 관절 ${absent}개가 더 보여야 합니다.`
+              ? `관절 ${absent}개 미인식 · 촬영 준비 중…`
               : "자세를 잠시 유지해 주세요."
           : "카메라 권한과 준비 상태를 확인해 주세요."}
       </p>
@@ -412,7 +409,7 @@ export function Camera(props: Props) {
         ) : (
           <button
             className="primary"
-            disabled={locked || state !== "live" || (!delay && !ready)}
+            disabled={locked || state !== "live"}
             onClick={shutter}
           >
             {delay ? delay + "초 뒤 " : ""}

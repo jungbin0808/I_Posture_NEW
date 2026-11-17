@@ -2,6 +2,8 @@ package com.iposture.rebuilt;
 
 import android.Manifest;
 import android.app.Activity;
+import android.print.PrintManager;
+import android.print.PrintAttributes;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
@@ -95,6 +97,7 @@ public class MainActivity extends Activity {
     @Override protected void onPause(){web.evaluateJavascript("window.dispatchEvent(new Event('iposture:pause'))",null);super.onPause();}
     @Override protected void onDestroy(){if(picker!=null)picker.onReceiveValue(null);if(cameraRequest!=null)cameraRequest.deny();web.removeJavascriptInterface("NativeHost");web.destroy();super.onDestroy();}
     public final class NativeHost {
+        @JavascriptInterface public void printReport(){runOnUiThread(()->{PrintManager manager=(PrintManager)getSystemService(PRINT_SERVICE);if(manager!=null)manager.print("아이포스처 측정 리포트",web.createPrintDocumentAdapter("아이포스처 측정 리포트"),new PrintAttributes.Builder().setMediaSize(PrintAttributes.MediaSize.ISO_A4).build());});}
         @JavascriptInterface public void exitApp(){runOnUiThread(()->finish());}
         @JavascriptInterface public void exportJson(String json){if(json==null||json.length()>20*1024*1024)return;runOnUiThread(()->{export=json;Intent intent=new Intent(Intent.ACTION_CREATE_DOCUMENT);intent.setType("application/json");intent.addCategory(Intent.CATEGORY_OPENABLE);intent.putExtra(Intent.EXTRA_TITLE,"iposture-records.json");startActivityForResult(intent,30);});}
     }

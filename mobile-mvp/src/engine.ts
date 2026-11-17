@@ -173,6 +173,11 @@ export function missing(
       p[k].y > heightRatio * 1000,
   );
 }
+export function cleanPose(p: Pose, heightRatio = Infinity): Pose {
+  return Object.fromEntries(
+    Object.entries(p).filter(([key]) => !missing(p, [key], heightRatio).length),
+  );
+}
 export function assertPose(p: Pose, required: string[]) {
   if (missing(p, required).length)
     throw new Error("필요한 관절이 선명하게 보이도록 다시 촬영해 주세요.");
@@ -180,8 +185,27 @@ export function assertPose(p: Pose, required: string[]) {
 export async function precision(key: string, start: Pose, end: Pose) {
   const motion = motions.find((m) => m.key === key);
   if (!motion) throw new Error("지원하지 않는 동작입니다.");
-  assertPose(start, motion.required);
-  assertPose(end, motion.required);
+  start = cleanPose(start);
+  end = cleanPose(end);
+  const absent = [
+    ...new Set([
+      ...missing(start, motion.required),
+      ...missing(end, motion.required),
+    ]),
+  ];
+  const base = {
+    key,
+    label: motion.group + " " + motion.label,
+    referenceStatus: "unavailable",
+    algorithm: "original-iposture",
+  };
+  if (absent.length)
+    return {
+      ...base,
+      angle: null,
+      reason: "필요 관절 미인식",
+      missingJoints: absent,
+    };
   const strategies: Record<
     string,
     () => { execute: (p: any) => Promise<any> }
@@ -201,10 +225,15 @@ export async function precision(key: string, start: Pose, end: Pose) {
     String(result.scoreDetail[motion.resultKey]?.result),
   );
   if (!Number.isFinite(angle))
-    throw new Error(
-      "관절 각도를 계산하지 못했습니다. 촬영 방향을 확인해 주세요.",
-    );
+    return {
+      ...base,
+      angle: null,
+      reason: "관절 각도 계산 불가",
+      missingJoints: [],
+    };
   return {
+    reason: "",
+    missingJoints: [] as string[],
     angle: Math.round(angle * 10) / 10,
     key,
     label: motion.group + " " + motion.label,
@@ -213,7 +242,16 @@ export async function precision(key: string, start: Pose, end: Pose) {
   };
 }
 export function joint(a?: Point, b?: Point, c?: Point): number | null {
-  if (!a || !b || !c || [a, b, c].some((p) => p.visibility < 0.5)) return null;
+  if (
+    !a ||
+    !b ||
+    !c ||
+    [a, b, c].some(
+      (p) =>
+        p.visibility < 0.5 || !Number.isFinite(p.x) || !Number.isFinite(p.y),
+    )
+  )
+    return null;
   const u = [a.x - b.x, a.y - b.y],
     v = [c.x - b.x, c.y - b.y],
     d = Math.hypot(...u) * Math.hypot(...v);

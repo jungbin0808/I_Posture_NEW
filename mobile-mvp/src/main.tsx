@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
+import { Report } from "./Report";
 import { Camera } from "./Camera";
 import {
   motions,
   bodyRequired,
   bodyCore,
-  assertPose,
+  cleanPose,
   precision,
   type Shot,
 } from "./engine";
@@ -16,7 +17,11 @@ import { records, save, remove, type Entry } from "./store";
 import "./style.css";
 declare global {
   interface Window {
-    NativeHost?: { exportJson: (json: string) => void; exitApp: () => void };
+    NativeHost?: {
+      exportJson: (json: string) => void;
+      exitApp: () => void;
+      printReport?: () => void;
+    };
     onAppBack?: () => void;
   }
 }
@@ -256,6 +261,7 @@ function App() {
     } else if (
       route === "choose" ||
       route === "history" ||
+      route === "report" ||
       route === "inbody" ||
       route === "detail"
     )
@@ -288,10 +294,6 @@ function App() {
   }
   function accept(shot: Shot) {
     try {
-      assertPose(
-        shot.points,
-        kind === "body" ? bodyRequired(step) : motion.required,
-      );
       if (
         kind === "precision" &&
         step === 1 &&
@@ -337,10 +339,11 @@ function App() {
     setStatus("측정 결과를 계산하고 저장하고 있어요.");
     setError("");
     try {
+      const points = shots.map((s) => cleanPose(s.points, s.height / s.width));
       const data =
         kind === "body"
-          ? await body(shots[0].points, shots[1].points, shots[2].points)
-          : await precision(key, shots[0].points, shots[1].points);
+          ? await body(points[0], points[1], points[2])
+          : await precision(key, points[0], points[1]);
       await finish({
         kind,
         title:
@@ -460,7 +463,7 @@ function App() {
         ? names.length + (kind === "precision" ? 1 : 0)
         : step + (kind === "precision" ? 1 : 0);
   return (
-    <div className="app">
+    <div className={"app " + (route === "report" ? "report-route" : "")}>
       <header>
         <button
           className="brand"
@@ -473,7 +476,7 @@ function App() {
       </header>
       <main>
         {route !== "home" && (
-          <button className="back" disabled={busy} onClick={back}>
+          <button className="back no-print" disabled={busy} onClick={back}>
             ← 돌아가기
           </button>
         )}
@@ -994,9 +997,47 @@ function App() {
             )}
           </section>
         )}
+        {route === "report" && (
+          <Report
+            key={selected?.id || "all"}
+            entries={entries}
+            initialId={selected?.id}
+            media={(e) =>
+              e.kind === "motion" ? (
+                <>
+                  <Clip blob={e.media[0]} />
+                  <Chart frames={e.data.frames} />
+                </>
+              ) : (
+                <div className="photos">
+                  {e.media.map((blob, i) => (
+                    <div key={i}>
+                      {e.kind !== "inbody" && (
+                        <h4>
+                          {e.kind === "body"
+                            ? ["정면", "우측면", "후면"][i]
+                            : ["시작 자세", "움직인 자세"][i]}
+                        </h4>
+                      )}
+                      {e.data.captures?.[i] ? (
+                        <Photo shot={{ ...e.data.captures[i], image: blob }} />
+                      ) : (
+                        <Still blob={blob} />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )
+            }
+          />
+        )}
         {route === "detail" && selected && (
           <Detail
             value={selected}
+            onReport={() => {
+              setRoute("report");
+              window.scrollTo(0, 0);
+            }}
             onDelete={async () => {
               await remove(selected.id);
               setSelected(null);
@@ -1015,6 +1056,7 @@ function App() {
           ["home", "⌂", "홈"],
           ["choose", "◎", "측정"],
           ["history", "◷", "기록"],
+          ["report", "▧", "리포트"],
         ].map(([r, s, l]) => (
           <button
             key={r}
@@ -1033,9 +1075,11 @@ function App() {
 function Detail({
   value: e,
   onDelete,
+  onReport,
 }: {
   value: Entry;
   onDelete: () => Promise<void>;
+  onReport: () => void;
 }) {
   const [confirm, setConfirm] = useState(false),
     [error, setError] = useState("");
@@ -1044,11 +1088,18 @@ function Detail({
       <span className="eyebrow">MY BODY RECORD</span>
       <h2>{e.title}</h2>
       <p className="muted">{new Date(e.date).toLocaleString("ko-KR")}</p>
+      <button className="primary full report-link" onClick={onReport}>
+        측정 리포트 보기 →
+      </button>
       {e.kind === "precision" && (
         <>
           <div className="angle-result">
             <small>측정 각도</small>
-            <strong>{e.data.angle}°</strong>
+            <strong>
+              {typeof e.data.angle === "number"
+                ? `${e.data.angle}°`
+                : "측정 불가"}
+            </strong>
           </div>
           <p className="notice">
             기존 아이포스처 계산 코드 적용 · 정상 기준 데이터가 없어 정상/비정상
@@ -1061,7 +1112,9 @@ function Detail({
           {e.data.metrics.map((m: any) => (
             <div className="panel" key={m.label}>
               <small>{m.label}</small>
-              <strong>{m.value}°</strong>
+              <strong>
+                {typeof m.value === "number" ? `${m.value}°` : "측정 불가"}
+              </strong>
             </div>
           ))}
         </div>

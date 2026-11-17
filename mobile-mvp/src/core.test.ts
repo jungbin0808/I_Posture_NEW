@@ -80,13 +80,34 @@ describe("ported original measurement engines", () => {
       ),
     ).toEqual(["a", "b", "c"]);
   });
-  it("rejects missing precision inputs and unknown keys", async () => {
-    await expect(precision("ElbowLeftFlexion", {}, {})).rejects.toThrow();
+  it("keeps missing precision inputs as unmeasured and rejects unknown keys", async () => {
+    expect((await precision("ElbowLeftFlexion", {}, {})).angle).toBeNull();
     await expect(precision("unknown", p, p)).rejects.toThrow();
   });
-  it("runs all body analysis classes with clean state each time", async () => {
+  it("runs body display calculations with clean state each time", async () => {
     const one = await body(p, p, p);
     expect(one.metrics).toHaveLength(6);
     expect(await body(p, p, p)).toEqual(one);
   });
+});
+
+it("keeps partial body results and never turns absent joints into zero angles", async () => {
+  const result = await body(
+    { LeftShoulder: p.LeftShoulder, RightShoulder: p.RightShoulder },
+    {},
+    {},
+  );
+  expect(
+    result.metrics.filter((m) => m.value !== null).map((m) => m.label),
+  ).toEqual(["어깨 높이 차"]);
+  expect(result.metrics.find((m) => m.label === "어깨 높이 차")?.value).toBe(0);
+  expect((await body({}, {}, {})).metrics.every((m) => m.value === null)).toBe(
+    true,
+  );
+});
+it("treats low confidence precision joints as unmeasured", async () => {
+  const arm = { ...p, LeftWrist: { ...p.LeftWrist, visibility: 0.1 } };
+  const result = await precision("ElbowLeftFlexion", arm, p);
+  expect(result.angle).toBeNull();
+  expect(result.missingJoints).toContain("LeftWrist");
 });

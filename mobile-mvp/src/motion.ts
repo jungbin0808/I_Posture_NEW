@@ -1,5 +1,5 @@
 import { tracker } from "./pose";
-import { angles } from "./engine";
+import { angles, cleanPose } from "./engine";
 export type Frame = { time: number; angles: ReturnType<typeof angles> };
 export async function analyzeVideo(file: File, progress: (n: number) => void) {
   if (!file.type.startsWith("video/") || file.size > 100 * 1024 * 1024)
@@ -53,11 +53,12 @@ export async function analyzeVideo(file: File, progress: (n: number) => void) {
       });
       frame.getContext("2d")!.drawImage(video, 0, 0, frame.width, frame.height);
       const points = await model.infer(frame);
-      frames.push({ time: t, angles: angles(points || {}) });
+      frames.push({
+        time: t,
+        angles: angles(cleanPose(points || {}, frame.height / frame.width)),
+      });
       progress(Math.round(((t + 1) / Math.ceil(video.duration)) * 100));
     }
-    if (!frames.some((f) => Object.values(f.angles).some((v) => v !== null)))
-      throw new Error("영상에서 관절을 찾지 못했습니다.");
     return { duration: video.duration, frames };
   } finally {
     video.removeAttribute("src");

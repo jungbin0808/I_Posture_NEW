@@ -198,9 +198,8 @@ export async function imageShot(file: File): Promise<Shot> {
       .drawImage(image, 0, 0, canvas.width, canvas.height);
     detector = await tracker();
     const points = await detector.infer(canvas);
-    if (!points) throw new Error("사람을 찾지 못했습니다.");
     return {
-      points,
+      points: points || {},
       image: await jpeg(canvas),
       width: canvas.width,
       height: canvas.height,
